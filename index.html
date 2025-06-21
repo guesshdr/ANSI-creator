@@ -16,67 +16,70 @@
     <label><input type="checkbox" id="singleMode"> Tryb pojedynczego koloru</label>
     <label>Kolor FG (single/gradient start):<input type="color" id="fgStart" value="#f7e3e3"></label>
     <label id="endLabel">Gradient FG koniec:<input type="color" id="fgEnd" value="#000000"></label>
-    <button id="applyGrad">Zastosuj</button>
+    <button id="applyGrad">Zastosuj do zaznaczenia</button>
   </div>
   <div id="preview" contenteditable="true" placeholder="Wpisz tekst tutaj..."></div>
   <h3>Raw ANSI output:</h3>
   <textarea id="raw"></textarea>
 
   <script>
-    function hex2rgb(h) { let [r,g,b] = h.slice(1).match(/.{2}/g).map(x=>parseInt(x,16)); return [r,g,b]; }
-    function lerp(a,b,t){return a + (b-a)*t;}
-    /** Kolorowanie preview na podstawie trybu */
-    function applyColors() {
-      const text = preview.innerText;
-      preview.innerHTML = '';
+    function hex2rgb(h) {
+      return h.slice(1).match(/.{2}/g).map(x => parseInt(x, 16));
+    }
+    function lerp(a,b,t){ return a + (b-a)*t; }
+
+    function applyColorsToSelection() {
+      const sel = window.getSelection();
+      if (!sel.rangeCount) return;
+      const range = sel.getRangeAt(0);
+      const text = range.toString();
+      if (!text) return;
+
       const isSingle = singleMode.checked;
       const c1 = hex2rgb(fgStart.value);
       const c2 = hex2rgb(fgEnd.value);
-      for(let i=0;i<text.length;i++){
+
+      const fragment = document.createDocumentFragment();
+      for (let i = 0; i < text.length; i++) {
         const span = document.createElement('span');
-        let rgb;
-        if(isSingle) {
-          rgb = c1;
-        } else {
-          const t = i/(text.length-1||1);
-          rgb = [
-            Math.round(lerp(c1[0], c2[0], t)),
-            Math.round(lerp(c1[1], c2[1], t)),
-            Math.round(lerp(c1[2], c2[2], t))
-          ];
-        }
+        const t = i / (text.length - 1 || 1);
+        const rgb = isSingle ? c1 : [
+          Math.round(lerp(c1[0], c2[0], t)),
+          Math.round(lerp(c1[1], c2[1], t)),
+          Math.round(lerp(c1[2], c2[2], t))
+        ];
         span.style.color = `rgb(${rgb.join(',')})`;
         span.textContent = text[i];
-        preview.append(span);
+        fragment.appendChild(span);
       }
-      generateRaw(); save();
+      range.deleteContents();
+      range.insertNode(fragment);
+      generateRaw();
     }
-    /** Generowanie raw ANSI, emitując kody dla każdej zmiany koloru */
+
     function generateRaw() {
       let raw = '';
       let prevColor = null;
-      preview.querySelectorAll('span').forEach(span => {
-        const style = span.style.color;
-        if(style) {
-          const rgb = style.match(/\d+/g).map(Number);
+      preview.childNodes.forEach(node => {
+        if (node.nodeType === Node.TEXT_NODE) {
+          raw += node.textContent;
+          return;
+        }
+        if (node.nodeType === Node.ELEMENT_NODE && node.style.color) {
+          const rgb = node.style.color.match(/\d+/g).map(Number);
           const code = `\x1b[38;2;${rgb[0]};${rgb[1]};${rgb[2]}m`;
-          if(!prevColor || prevColor.join(',') !== rgb.join(',')) {
+          if (!prevColor || prevColor.join(',') !== rgb.join(',')) {
             raw += code;
             prevColor = rgb;
           }
-        } else if(prevColor) {
-          raw += '\x1b[0m';
-          prevColor = null;
+          raw += node.textContent;
         }
-        raw += span.textContent;
       });
-      if(prevColor) raw += '\x1b[0m';
+      if (prevColor) raw += '\x1b[0m';
       rawArea.value = raw;
     }
-    function save(){ localStorage.setItem('ansiRaw', rawArea.value); }
-    function load(){ const v = localStorage.getItem('ansiRaw'); if(v) rawArea.value = v; renderRaw(); }
-    /** Parsowanie raw i wyświetlanie kolorów w preview */
-    function renderRaw(){
+
+    function renderRaw() {
       const ansiRe = /\x1b\[([0-9;]+)m/g;
       let m; let last=0; preview.innerHTML=''; let currColor = null;
       while((m=ansiRe.exec(rawArea.value))!==null) {
@@ -99,6 +102,7 @@
         });
       }
     }
+
     const singleMode = document.getElementById('singleMode');
     const endLabel = document.getElementById('endLabel');
     singleMode.addEventListener('change', ()=>{
@@ -109,10 +113,11 @@
     const applyGrad = document.getElementById('applyGrad');
     const preview = document.getElementById('preview');
     const rawArea = document.getElementById('raw');
-    applyGrad.addEventListener('click', applyColors);
-    rawArea.addEventListener('input', ()=>{ renderRaw(); save(); });
-    preview.addEventListener('input', ()=>{ generateRaw(); save(); });
-    window.addEventListener('load', load);
+
+    applyGrad.addEventListener('click', applyColorsToSelection);
+    rawArea.addEventListener('input', renderRaw);
+    preview.addEventListener('input', generateRaw);
+    window.addEventListener('load', renderRaw);
   </script>
 </body>
 </html>
