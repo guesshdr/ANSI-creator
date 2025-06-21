@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ASCII Gradient Colorizer</title>
   <style>
     body {
@@ -79,10 +79,10 @@
     </label>
   </div>
 
-  <button id="applyBtn">Zastosuj gradient</button>
+  <button id="applyBtn">Zastosuj gradient do zaznaczenia</button>
 
   <h2>Wyjście:</h2>
-  <div id="output"></div>
+  <div id="output" contenteditable="true"></div>
 
   <script>
     function hexToRgb(hex) {
@@ -99,14 +99,22 @@
     }
 
     document.getElementById('applyBtn').addEventListener('click', () => {
-      const text = document.getElementById('inputText').value;
+      const selection = window.getSelection();
+      const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+
+      if (!range || range.collapsed) {
+        alert('Zaznacz tekst w polu wyjściowym przed zastosowaniem gradientu.');
+        return;
+      }
+
       const fgStart = hexToRgb(document.getElementById('fgStart').value);
       const fgEnd = hexToRgb(document.getElementById('fgEnd').value);
       const bgStart = hexToRgb(document.getElementById('bgStart').value);
       const bgEnd = hexToRgb(document.getElementById('bgEnd').value);
 
+      const text = range.toString();
       const length = text.length;
-      let html = '';
+      let gradientHTML = '';
 
       for (let i = 0; i < length; i++) {
         const t = length > 1 ? i / (length - 1) : 0;
@@ -118,10 +126,13 @@
         const b2 = Math.round(lerp(bgStart.b, bgEnd.b, t));
         const ch = text[i] === ' ' ? '&nbsp;' : text[i];
 
-        html += `<span style="color: rgb(${r1},${g1},${b1}); background-color: rgb(${r2},${g2},${b2});">${ch}</span>`;
+        gradientHTML += `<span style="color: rgb(${r1},${g1},${b1}); background-color: rgb(${r2},${g2},${b2});">${ch}</span>`;
       }
 
-      document.getElementById('output').innerHTML = html;
+      const span = document.createElement('span');
+      span.innerHTML = gradientHTML;
+      range.deleteContents();
+      range.insertNode(span);
     });
   </script>
 </body>
