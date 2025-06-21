@@ -1,86 +1,128 @@
 <!DOCTYPE html>
-<html lang="pl">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Gradient ASCII ANSI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ASCII Gradient Colorizer</title>
   <style>
     body {
       font-family: monospace;
-      background: #121212;
-      color: #f0f0f0;
       padding: 20px;
+      background: #222;
+      color: #eee;
     }
-    textarea, input[type="color"] {
+    textarea {
       width: 100%;
-      margin-top: 10px;
-    }
-    pre {
-      background: #1e1e1e;
+      height: 200px;
+      margin-bottom: 10px;
+      font-family: monospace;
+      font-size: 14px;
+      background: #333;
+      color: #eee;
+      border: none;
       padding: 10px;
+      border-radius: 4px;
+    }
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .controls label {
+      display: flex;
+      flex-direction: column;
+      font-size: 14px;
+    }
+    #output {
       white-space: pre-wrap;
       word-break: break-word;
-      border-radius: 5px;
-      margin-top: 20px;
+      padding: 10px;
+      background: #333;
+      border-radius: 4px;
+      min-height: 200px;
     }
-    label {
-      margin-top: 10px;
-      display: block;
+    button {
+      padding: 8px 12px;
+      font-size: 14px;
+      border: none;
+      background: #5a9;
+      color: #fff;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #48a;
     }
   </style>
 </head>
 <body>
+  <h1>ASCII Gradient Colorizer</h1>
+  <textarea id="inputText" placeholder="Wpisz tutaj swój ASCII...">Hello, Gradient ASCII!</textarea>
 
-<h1>🎨 Gradient do ASCII z ANSI Escape</h1>
+  <div class="controls">
+    <label>
+      Kolor startowy (tekst)
+      <input type="color" id="fgStart" value="#ffffff">
+    </label>
+    <label>
+      Kolor końcowy (tekst)
+      <input type="color" id="fgEnd" value="#ff0000">
+    </label>
+    <label>
+      Kolor startowy (tło)
+      <input type="color" id="bgStart" value="#000000">
+    </label>
+    <label>
+      Kolor końcowy (tło)
+      <input type="color" id="bgEnd" value="#000000">
+    </label>
+  </div>
 
-<label for="ascii">Wprowadź ASCII art / tekst:</label>
-<textarea id="ascii" rows="6">Hello\nWorld!</textarea>
+  <button id="applyBtn">Zastosuj gradient</button>
 
-<label for="startColor">Kolor początkowy:</label>
-<input type="color" id="startColor" value="#f7e3e3">
+  <h2>Wyjście:</h2>
+  <div id="output"></div>
 
-<label for="endColor">Kolor końcowy:</label>
-<input type="color" id="endColor" value="#000000">
-
-<button onclick="applyGradient()">🎨 Generuj z gradientem</button>
-
-<h2>Wynikowy tekst ANSI:</h2>
-<pre id="output"></pre>
-
-<script>
-function hexToRgb(hex) {
-  const bigint = parseInt(hex.slice(1), 16);
-  return [ (bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255 ];
-}
-
-function applyGradient() {
-  const text = document.getElementById("ascii").value.replace(/\r/g, "");
-  const startColor = hexToRgb(document.getElementById("startColor").value);
-  const endColor = hexToRgb(document.getElementById("endColor").value);
-  const output = [];
-
-  const totalChars = text.replace(/\n/g, '').length;
-  let charIndex = 0;
-
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i];
-    if (char === "\n") {
-      output.push("\\x1b[0m\n");
-      continue;
+  <script>
+    function hexToRgb(hex) {
+      const bigint = parseInt(hex.slice(1), 16);
+      return {
+        r: (bigint >> 16) & 255,
+        g: (bigint >> 8) & 255,
+        b: bigint & 255
+      };
     }
 
-    const ratio = totalChars <= 1 ? 0 : charIndex / (totalChars - 1);
-    const r = Math.round(startColor[0] + ratio * (endColor[0] - startColor[0]));
-    const g = Math.round(startColor[1] + ratio * (endColor[1] - startColor[1]));
-    const b = Math.round(startColor[2] + ratio * (endColor[2] - startColor[2]));
+    function lerp(a, b, t) {
+      return a + (b - a) * t;
+    }
 
-    output.push(`\\x1b[38;2;${r};${g};${b}m${char}`);
-    charIndex++;
-  }
+    document.getElementById('applyBtn').addEventListener('click', () => {
+      const text = document.getElementById('inputText').value;
+      const fgStart = hexToRgb(document.getElementById('fgStart').value);
+      const fgEnd = hexToRgb(document.getElementById('fgEnd').value);
+      const bgStart = hexToRgb(document.getElementById('bgStart').value);
+      const bgEnd = hexToRgb(document.getElementById('bgEnd').value);
 
-  output.push("\\x1b[0m");
-  document.getElementById("output").textContent = output.join('');
-}
-</script>
+      const length = text.length;
+      let html = '';
 
+      for (let i = 0; i < length; i++) {
+        const t = length > 1 ? i / (length - 1) : 0;
+        const r1 = Math.round(lerp(fgStart.r, fgEnd.r, t));
+        const g1 = Math.round(lerp(fgStart.g, fgEnd.g, t));
+        const b1 = Math.round(lerp(fgStart.b, fgEnd.b, t));
+        const r2 = Math.round(lerp(bgStart.r, bgEnd.r, t));
+        const g2 = Math.round(lerp(bgStart.g, bgEnd.g, t));
+        const b2 = Math.round(lerp(bgStart.b, bgEnd.b, t));
+        const ch = text[i] === ' ' ? '&nbsp;' : text[i];
+
+        html += `<span style="color: rgb(${r1},${g1},${b1}); background-color: rgb(${r2},${g2},${b2});">${ch}</span>`;
+      }
+
+      document.getElementById('output').innerHTML = html;
+    });
+  </script>
 </body>
 </html>
