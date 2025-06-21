@@ -1,105 +1,110 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-  <meta charset="UTF-8" />
-  <title>ANSI Gradient Generator</title>
+  <meta charset="UTF-8">
+  <title>ANSI Colorizer z Gradientem</title>
   <style>
-    body {
-      font-family: monospace;
-      background: #111;
-      color: #fff;
-      padding: 2rem;
-    }
-    input[type="color"] {
-      margin: 0 0.5rem;
-    }
-    textarea {
-      width: 100%;
-      height: 150px;
-      background: #222;
-      color: white;
-      border: 1px solid #555;
-      padding: 10px;
-      font-family: monospace;
-    }
-    #preview {
-      white-space: pre-wrap;
-      margin-top: 1rem;
-      padding: 1rem;
-      background: #000;
-      color: white;
-      border: 1px solid #666;
-      font-family: monospace;
-    }
-    #output {
-      margin-top: 1rem;
-      white-space: pre-wrap;
-      background: #111;
-      color: #0f0;
-      padding: 1rem;
-      border: 1px solid #333;
-    }
+    body { font-family: sans-serif; padding: 1rem; background: #f4f4f4; }
+    .controls { display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem; }
+    .controls label { display: flex; flex-direction: column; font-size: 0.9rem; }
+    #preview { white-space: pre-wrap; font-family: monospace; padding: 1rem; background: #fff; min-height: 200px; border: 1px solid #ccc; }
+    #raw { width: 100%; height: 200px; font-family: monospace; }
   </style>
 </head>
 <body>
-  <h2>🎨 ANSI Gradient Generator</h2>
-  <label>Kolor startowy: <input type="color" id="startColor" value="#f7e3e3"></label>
-  <label>Kolor końcowy: <input type="color" id="endColor" value="#000000"></label>
-
-  <textarea id="inputText" placeholder="Wpisz tekst..."></textarea>
-  <div id="preview"></div>
-  <h3>🔧 ANSI Output:</h3>
-  <div id="output"></div>
+  <div class="controls">
+    <label>Gradient FG start:<input type="color" id="fgStart" value="#f7e3e3"></label>
+    <label>Gradient FG end:<input type="color" id="fgEnd" value="#000000"></label>
+    <button id="applyGrad">Zastosuj gradient</button>
+  </div>
+  <div id="preview" contenteditable="true"></div>
+  <h3>Raw ANSI output:</h3>
+  <textarea id="raw"></textarea>
 
   <script>
-    const inputText = document.getElementById('inputText');
-    const preview = document.getElementById('preview');
-    const output = document.getElementById('output');
-    const startColor = document.getElementById('startColor');
-    const endColor = document.getElementById('endColor');
-
-    function hexToRgb(hex) {
-      const bigint = parseInt(hex.slice(1), 16);
-      return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
+    // helper: convert hex to [r,g,b]
+    function hex2rgb(h) {
+      let [r,g,b] = h.slice(1).match(/.{2}/g).map(x=>parseInt(x,16)); return [r,g,b];
     }
-
-    function interpolateColor(start, end, factor) {
-      return start.map((startVal, i) =>
-        Math.round(startVal + factor * (end[i] - startVal))
-      );
-    }
-
-    function generateGradient(text, startRgb, endRgb, startIndex) {
-      const visible = text.slice(startIndex);
-      let resultPreview = text.slice(0, startIndex);
-      let resultAnsi = `\x1b[0m`;
-      const len = visible.length;
-
-      for (let i = 0; i < len; i++) {
-        const factor = i / (len - 1 || 1);
-        const [r, g, b] = interpolateColor(startRgb, endRgb, factor);
-        resultPreview += `<span style="color: rgb(${r},${g},${b})">${visible[i]}</span>`;
-        resultAnsi += `\x1b[38;2;${r};${g};${b}m${visible[i]}`;
+    // helper: lerp
+    function lerp(a,b,t){return a + (b-a)*t;}
+    // apply gradient over text nodes
+    function applyGradient() {
+      const fg1 = hex2rgb(fgStart.value);
+      const fg2 = hex2rgb(fgEnd.value);
+      const text = preview.innerText;
+      preview.innerHTML = '';
+      for(let i=0;i<text.length;i++){
+        const t = i/(text.length-1||1);
+        const r = Math.round(lerp(fg1[0],fg2[0],t));
+        const g = Math.round(lerp(fg1[1],fg2[1],t));
+        const b = Math.round(lerp(fg1[2],fg2[2],t));
+        const span = document.createElement('span');
+        span.style.color = `rgb(${r},${g},${b})`;
+        span.textContent = text[i];
+        preview.append(span);
       }
-      resultAnsi += '\x1b[0m';
-      return { preview: resultPreview, ansi: resultAnsi };
+      syncRaw();
+      save();
     }
-
-    function update() {
-      const text = inputText.value;
-      const start = hexToRgb(startColor.value);
-      const end = hexToRgb(endColor.value);
-      const cursorPos = inputText.selectionStart || 0;
-      const { preview: colored, ansi } = generateGradient(text, start, end, cursorPos);
-      preview.innerHTML = colored;
-      output.textContent = ansi;
+    // sync raw with ANSI codes from preview
+    function syncRaw() {
+      let raw = '';
+      const spans = preview.querySelectorAll('span');
+      if(spans.length>0) {
+        spans.forEach(s=>{
+          const rgb = window.getComputedStyle(s).color.match(/\d+/g);
+          raw += `\x1b[38;2;${rgb[0]};${rgb[1]};${rgb[2]}m${s.textContent}`;
+        });
+        raw += '\x1b[0m';
+      } else {
+        raw = preview.innerText;
+      }
+      rawArea.value = raw;
     }
+    function save(){ localStorage.setItem('ansiRaw', rawArea.value); }
+    function load(){
+      const v = localStorage.getItem('ansiRaw');
+      if(v) rawArea.value=v;
+      renderRaw();
+    }
+    function renderRaw(){
+      const ansiRe = /\x1b\[([0-9;]+)m/g;
+      let m, last=0; preview.innerHTML='';
+      while((m=ansiRe.exec(rawArea.value))!==null){
+        const codes = m[1].split(';').map(Number);
+        // append text before
+        appendText(rawArea.value.slice(last, m.index));
+        last = ansiRe.lastIndex;
+        // parse codes
+        if(codes[0]===38 && codes[1]===2) {
+          const [r,g,b] = codes.slice(2,5);
+          currentColor = `rgb(${r},${g},${b})`;
+        } else if(codes[0]===0) {
+          currentColor = null;
+        }
+      }
+      appendText(rawArea.value.slice(last));
+      function appendText(str){
+        for(const ch of str){
+          const span = document.createElement('span');
+          if(currentColor) span.style.color = currentColor;
+          span.textContent = ch;
+          preview.append(span);
+        }
+      }
+    }
+    const fgStart=document.getElementById('fgStart');
+    const fgEnd=document.getElementById('fgEnd');
+    const applyGrad=document.getElementById('applyGrad');
+    const preview=document.getElementById('preview');
+    const rawArea=document.getElementById('raw');
+    let currentColor = null;
 
-    inputText.addEventListener('input', update);
-    inputText.addEventListener('click', update);
-    inputText.addEventListener('keyup', update);
-    startColor.addEventListener('change', update);
-    endColor.addEventListener('change', update);
+    applyGrad.addEventListener('click', applyGradient);
+    rawArea.addEventListener('input', ()=>{ renderRaw(); save(); });
+    preview.addEventListener('input', ()=>{ syncRaw(); save(); });
+    window.addEventListener('load', load);
   </script>
 </body>
 </html>
