@@ -1,164 +1,120 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ASCII Gradient Colorizer</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ANSI Gradient Generator</title>
   <style>
-    body {
-      font-family: monospace;
-      padding: 20px;
-      background: #222;
-      color: #eee;
-    }
-    textarea {
-      width: 100%;
-      height: 200px;
-      margin-bottom: 10px;
-      font-family: monospace;
-      font-size: 14px;
-      background: #333;
-      color: #eee;
-      border: none;
-      padding: 10px;
-      border-radius: 4px;
-    }
-    .controls {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 10px;
-      margin-bottom: 10px;
-    }
-    .controls label {
-      display: flex;
-      flex-direction: column;
-      font-size: 14px;
-    }
-    #ansiOutput {
-      white-space: pre-wrap;
-      word-break: break-word;
-      padding: 10px;
-      background: #111;
-      border-radius: 4px;
-      color: #0f0;
-      font-size: 13px;
-      min-height: 200px;
-    }
-    button {
-      padding: 8px 12px;
-      font-size: 14px;
-      border: none;
-      background: #5a9;
-      color: #fff;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    button:hover {
-      background: #48a;
-    }
-    .options {
-      margin: 10px 0;
-    }
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    label { display: block; margin: 10px 0 5px; }
+    textarea { width: 100%; height: 100px; font-family: monospace; }
+    pre { background: #f4f4f4; padding: 10px; white-space: pre-wrap; word-break: break-all; }
+    .controls { display: flex; gap: 20px; flex-wrap: wrap; }
+    .controls > div { flex: 1; min-width: 200px; }
+    button { margin-top: 10px; padding: 10px 20px; font-size: 1em; }
   </style>
 </head>
 <body>
-  <h1>ASCII Gradient Colorizer</h1>
-
-  <textarea id="inputText" placeholder="Wpisz tutaj swój ASCII...">Hello, Gradient ASCII!</textarea>
+  <h1>ANSI Gradient Generator</h1>
+  <label for="textInput">Tekst do pokolorowania:</label>
+  <textarea id="textInput" placeholder="Wprowadź tekst..."></textarea>
 
   <div class="controls">
-    <label>
-      Kolor startowy (tekst)
-      <input type="color" id="fgStart" value="#ffffff">
-    </label>
-    <label>
-      Kolor końcowy (tekst)
-      <input type="color" id="fgEnd" value="#ff0000">
-    </label>
-    <label>
-      Kolor startowy (tło)
-      <input type="color" id="bgStart" value="#000000">
-    </label>
-    <label>
-      Kolor końcowy (tło)
-      <input type="color" id="bgEnd" value="#000000">
-    </label>
+    <div>
+      <label for="fgStart">Kolor tekstu - start:</label>
+      <input type="color" id="fgStart" value="#f7e3e3">
+    </div>
+    <div>
+      <label for="fgEnd">Kolor tekstu - koniec:</label>
+      <input type="color" id="fgEnd" value="#000000">
+    </div>
+    <div>
+      <label for="bgStart">Kolor tła - start:</label>
+      <input type="color" id="bgStart" value="#ffffff">
+    </div>
+    <div>
+      <label for="bgEnd">Kolor tła - koniec:</label>
+      <input type="color" id="bgEnd" value="#ffffff">
+    </div>
   </div>
 
-  <div class="options">
-    <label><input type="checkbox" id="includeFG" checked> Użyj tekstu</label>
-    <label><input type="checkbox" id="includeBG"> Użyj tła</label>
-  </div>
+  <button id="generateBtn">Generuj ANSI & Wyświetl</button>
+  <button id="downloadBtn">Pobierz jako plik .txt</button>
 
-  <button id="applyBtn">Zastosuj gradient do zaznaczenia</button>
+  <h2>Podgląd w HTML:</h2>
+  <pre id="htmlPreview"></pre>
 
   <h2>Wyjście ANSI:</h2>
-  <div id="ansiOutput"></div>
+  <textarea id="ansiOutput" readonly></textarea>
 
   <script>
     function hexToRgb(hex) {
-      const bigint = parseInt(hex.slice(1), 16);
-      return {
-        r: (bigint >> 16) & 255,
-        g: (bigint >> 8) & 255,
-        b: bigint & 255
-      };
+      hex = hex.replace('#', '');
+      const bigint = parseInt(hex, 16);
+      return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
     }
 
     function lerp(a, b, t) {
       return a + (b - a) * t;
     }
 
-    function ansiColor(r, g, b, isBG = false) {
-      return `\u001b[${isBG ? 48 : 38};2;${r};${g};${b}m`;
+    function gradientColors(start, end, steps) {
+      const result = [];
+      for (let i = 0; i < steps; i++) {
+        const t = steps > 1 ? i / (steps - 1) : 0;
+        result.push([
+          Math.round(lerp(start[0], end[0], t)),
+          Math.round(lerp(start[1], end[1], t)),
+          Math.round(lerp(start[2], end[2], t))
+        ]);
+      }
+      return result;
     }
 
-    document.getElementById('applyBtn').addEventListener('click', () => {
-      const textarea = document.getElementById('inputText');
-      const inputText = textarea.value;
-      const selectionStart = textarea.selectionStart;
-      const selectionEnd = textarea.selectionEnd;
-
-      if (selectionStart === selectionEnd) {
-        alert("Zaznacz fragment tekstu w polu wejściowym.");
-        return;
-      }
-
+    document.getElementById('generateBtn').addEventListener('click', () => {
+      const text = document.getElementById('textInput').value;
       const fgStart = hexToRgb(document.getElementById('fgStart').value);
-      const fgEnd = hexToRgb(document.getElementById('fgEnd').value);
+      const fgEnd   = hexToRgb(document.getElementById('fgEnd').value);
       const bgStart = hexToRgb(document.getElementById('bgStart').value);
-      const bgEnd = hexToRgb(document.getElementById('bgEnd').value);
-      const useFG = document.getElementById('includeFG').checked;
-      const useBG = document.getElementById('includeBG').checked;
+      const bgEnd   = hexToRgb(document.getElementById('bgEnd').value);
 
-      const selected = inputText.slice(selectionStart, selectionEnd);
-      let output = '';
+      const chars = Array.from(text);
+      const fgGrad = gradientColors(fgStart, fgEnd, chars.length);
+      const bgGrad = gradientColors(bgStart, bgEnd, chars.length);
 
-      for (let i = 0; i < selected.length; i++) {
-        const t = selected.length > 1 ? i / (selected.length - 1) : 0;
+      // HTML preview
+      const htmlPreview = chars.map((ch, i) => {
+        const [fr, fg, fb] = fgGrad[i];
+        const [br, bg, bb] = bgGrad[i];
+        const span = document.createElement('span');
+        span.textContent = ch;
+        span.style.color = `rgb(${fr},${fg},${fb})`;
+        span.style.backgroundColor = `rgb(${br},${bg},${bb})`;
+        return span.outerHTML;
+      }).join('');
+      document.getElementById('htmlPreview').innerHTML = htmlPreview;
 
-        let ansi = '';
+      // ANSI output
+      let ansi = '';
+      chars.forEach((ch, i) => {
+        const [fr, fg, fb] = fgGrad[i];
+        const [br, bg, bb] = bgGrad[i];
+        ansi += `\u001b[38;2;${fr};${fg};${fb}m`;
+        ansi += `\u001b[48;2;${br};${bg};${bb}m`;
+        ansi += ch;
+      });
+      ansi += '\u001b[0m';
+      document.getElementById('ansiOutput').value = ansi;
+    });
 
-        if (useFG) {
-          const rF = Math.round(lerp(fgStart.r, fgEnd.r, t));
-          const gF = Math.round(lerp(fgStart.g, fgEnd.g, t));
-          const bF = Math.round(lerp(fgStart.b, fgEnd.b, t));
-          ansi += ansiColor(rF, gF, bF);
-        }
-
-        if (useBG) {
-          const rB = Math.round(lerp(bgStart.r, bgEnd.r, t));
-          const gB = Math.round(lerp(bgStart.g, bgEnd.g, t));
-          const bB = Math.round(lerp(bgStart.b, bgEnd.b, t));
-          ansi += ansiColor(rB, gB, bB, true);
-        }
-
-        const ch = selected[i];
-        output += `${ansi}${ch}`;
-      }
-
-      output += '\u001b[0m';
-      document.getElementById('ansiOutput').textContent = output;
+    document.getElementById('downloadBtn').addEventListener('click', () => {
+      const blob = new Blob([document.getElementById('ansiOutput').value], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'gradient.txt';
+      a.click();
+      URL.revokeObjectURL(url);
     });
   </script>
 </body>
