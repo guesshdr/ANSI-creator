@@ -1,121 +1,105 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
   <title>ANSI Gradient Generator</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    label { display: block; margin: 10px 0 5px; }
-    textarea { width: 100%; height: 100px; font-family: monospace; }
-    pre { background: #f4f4f4; padding: 10px; white-space: pre-wrap; word-break: break-all; }
-    .controls { display: flex; gap: 20px; flex-wrap: wrap; }
-    .controls > div { flex: 1; min-width: 200px; }
-    button { margin-top: 10px; padding: 10px 20px; font-size: 1em; }
+    body {
+      font-family: monospace;
+      background: #111;
+      color: #fff;
+      padding: 2rem;
+    }
+    input[type="color"] {
+      margin: 0 0.5rem;
+    }
+    textarea {
+      width: 100%;
+      height: 150px;
+      background: #222;
+      color: white;
+      border: 1px solid #555;
+      padding: 10px;
+      font-family: monospace;
+    }
+    #preview {
+      white-space: pre-wrap;
+      margin-top: 1rem;
+      padding: 1rem;
+      background: #000;
+      color: white;
+      border: 1px solid #666;
+      font-family: monospace;
+    }
+    #output {
+      margin-top: 1rem;
+      white-space: pre-wrap;
+      background: #111;
+      color: #0f0;
+      padding: 1rem;
+      border: 1px solid #333;
+    }
   </style>
 </head>
 <body>
-  <h1>ANSI Gradient Generator</h1>
-  <label for="textInput">Tekst do pokolorowania:</label>
-  <textarea id="textInput" placeholder="Wprowadź tekst..."></textarea>
+  <h2>🎨 ANSI Gradient Generator</h2>
+  <label>Kolor startowy: <input type="color" id="startColor" value="#f7e3e3"></label>
+  <label>Kolor końcowy: <input type="color" id="endColor" value="#000000"></label>
 
-  <div class="controls">
-    <div>
-      <label for="fgStart">Kolor tekstu - start:</label>
-      <input type="color" id="fgStart" value="#f7e3e3">
-    </div>
-    <div>
-      <label for="fgEnd">Kolor tekstu - koniec:</label>
-      <input type="color" id="fgEnd" value="#000000">
-    </div>
-    <div>
-      <label for="bgStart">Kolor tła - start:</label>
-      <input type="color" id="bgStart" value="#ffffff">
-    </div>
-    <div>
-      <label for="bgEnd">Kolor tła - koniec:</label>
-      <input type="color" id="bgEnd" value="#ffffff">
-    </div>
-  </div>
-
-  <button id="generateBtn">Generuj ANSI & Wyświetl</button>
-  <button id="downloadBtn">Pobierz jako plik .txt</button>
-
-  <h2>Podgląd w HTML:</h2>
-  <pre id="htmlPreview"></pre>
-
-  <h2>Wyjście ANSI:</h2>
-  <textarea id="ansiOutput" readonly></textarea>
+  <textarea id="inputText" placeholder="Wpisz tekst..."></textarea>
+  <div id="preview"></div>
+  <h3>🔧 ANSI Output:</h3>
+  <div id="output"></div>
 
   <script>
+    const inputText = document.getElementById('inputText');
+    const preview = document.getElementById('preview');
+    const output = document.getElementById('output');
+    const startColor = document.getElementById('startColor');
+    const endColor = document.getElementById('endColor');
+
     function hexToRgb(hex) {
-      hex = hex.replace('#', '');
-      const bigint = parseInt(hex, 16);
+      const bigint = parseInt(hex.slice(1), 16);
       return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
     }
 
-    function lerp(a, b, t) {
-      return a + (b - a) * t;
+    function interpolateColor(start, end, factor) {
+      return start.map((startVal, i) =>
+        Math.round(startVal + factor * (end[i] - startVal))
+      );
     }
 
-    function gradientColors(start, end, steps) {
-      const result = [];
-      for (let i = 0; i < steps; i++) {
-        const t = steps > 1 ? i / (steps - 1) : 0;
-        result.push([
-          Math.round(lerp(start[0], end[0], t)),
-          Math.round(lerp(start[1], end[1], t)),
-          Math.round(lerp(start[2], end[2], t))
-        ]);
+    function generateGradient(text, startRgb, endRgb, startIndex) {
+      const visible = text.slice(startIndex);
+      let resultPreview = text.slice(0, startIndex);
+      let resultAnsi = `\x1b[0m`;
+      const len = visible.length;
+
+      for (let i = 0; i < len; i++) {
+        const factor = i / (len - 1 || 1);
+        const [r, g, b] = interpolateColor(startRgb, endRgb, factor);
+        resultPreview += `<span style="color: rgb(${r},${g},${b})">${visible[i]}</span>`;
+        resultAnsi += `\x1b[38;2;${r};${g};${b}m${visible[i]}`;
       }
-      return result;
+      resultAnsi += '\x1b[0m';
+      return { preview: resultPreview, ansi: resultAnsi };
     }
 
-    document.getElementById('generateBtn').addEventListener('click', () => {
-      const text = document.getElementById('textInput').value;
-      const fgStart = hexToRgb(document.getElementById('fgStart').value);
-      const fgEnd   = hexToRgb(document.getElementById('fgEnd').value);
-      const bgStart = hexToRgb(document.getElementById('bgStart').value);
-      const bgEnd   = hexToRgb(document.getElementById('bgEnd').value);
+    function update() {
+      const text = inputText.value;
+      const start = hexToRgb(startColor.value);
+      const end = hexToRgb(endColor.value);
+      const cursorPos = inputText.selectionStart || 0;
+      const { preview: colored, ansi } = generateGradient(text, start, end, cursorPos);
+      preview.innerHTML = colored;
+      output.textContent = ansi;
+    }
 
-      const chars = Array.from(text);
-      const fgGrad = gradientColors(fgStart, fgEnd, chars.length);
-      const bgGrad = gradientColors(bgStart, bgEnd, chars.length);
-
-      // HTML preview
-      const htmlPreview = chars.map((ch, i) => {
-        const [fr, fg, fb] = fgGrad[i];
-        const [br, bg, bb] = bgGrad[i];
-        const span = document.createElement('span');
-        span.textContent = ch;
-        span.style.color = `rgb(${fr},${fg},${fb})`;
-        span.style.backgroundColor = `rgb(${br},${bg},${bb})`;
-        return span.outerHTML;
-      }).join('');
-      document.getElementById('htmlPreview').innerHTML = htmlPreview;
-
-      // ANSI output
-      let ansi = '';
-      chars.forEach((ch, i) => {
-        const [fr, fg, fb] = fgGrad[i];
-        const [br, bg, bb] = bgGrad[i];
-        ansi += `\u001b[38;2;${fr};${fg};${fb}m`;
-        ansi += `\u001b[48;2;${br};${bg};${bb}m`;
-        ansi += ch;
-      });
-      ansi += '\u001b[0m';
-      document.getElementById('ansiOutput').value = ansi;
-    });
-
-    document.getElementById('downloadBtn').addEventListener('click', () => {
-      const blob = new Blob([document.getElementById('ansiOutput').value], { type: 'text/plain;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'gradient.txt';
-      a.click();
-      URL.revokeObjectURL(url);
-    });
+    inputText.addEventListener('input', update);
+    inputText.addEventListener('click', update);
+    inputText.addEventListener('keyup', update);
+    startColor.addEventListener('change', update);
+    endColor.addEventListener('change', update);
   </script>
 </body>
 </html>
