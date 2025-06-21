@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pl">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -34,12 +34,14 @@
       flex-direction: column;
       font-size: 14px;
     }
-    #output {
+    #ansiOutput {
       white-space: pre-wrap;
       word-break: break-word;
       padding: 10px;
-      background: #333;
+      background: #111;
       border-radius: 4px;
+      color: #0f0;
+      font-size: 13px;
       min-height: 200px;
     }
     button {
@@ -54,10 +56,14 @@
     button:hover {
       background: #48a;
     }
+    .options {
+      margin: 10px 0;
+    }
   </style>
 </head>
 <body>
   <h1>ASCII Gradient Colorizer</h1>
+
   <textarea id="inputText" placeholder="Wpisz tutaj swój ASCII...">Hello, Gradient ASCII!</textarea>
 
   <div class="controls">
@@ -79,10 +85,14 @@
     </label>
   </div>
 
+  <div class="options">
+    <label><input type="checkbox" id="includeBG" checked> Użyj tła</label>
+  </div>
+
   <button id="applyBtn">Zastosuj gradient do zaznaczenia</button>
 
-  <h2>Wyjście:</h2>
-  <div id="output" contenteditable="true"></div>
+  <h2>Wyjście ANSI:</h2>
+  <div id="ansiOutput"></div>
 
   <script>
     function hexToRgb(hex) {
@@ -98,12 +108,17 @@
       return a + (b - a) * t;
     }
 
-    document.getElementById('applyBtn').addEventListener('click', () => {
-      const selection = window.getSelection();
-      const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+    function ansiColor(r, g, b, isBG = false) {
+      return `\u001b[${isBG ? 48 : 38};2;${r};${g};${b}m`;
+    }
 
-      if (!range || range.collapsed) {
-        alert('Zaznacz tekst w polu wyjściowym przed zastosowaniem gradientu.');
+    document.getElementById('applyBtn').addEventListener('click', () => {
+      const inputText = document.getElementById('inputText').value;
+      const selectionStart = document.getElementById('inputText').selectionStart;
+      const selectionEnd = document.getElementById('inputText').selectionEnd;
+
+      if (selectionStart === selectionEnd) {
+        alert("Zaznacz fragment tekstu w polu wejściowym.");
         return;
       }
 
@@ -111,28 +126,33 @@
       const fgEnd = hexToRgb(document.getElementById('fgEnd').value);
       const bgStart = hexToRgb(document.getElementById('bgStart').value);
       const bgEnd = hexToRgb(document.getElementById('bgEnd').value);
+      const useBG = document.getElementById('includeBG').checked;
 
-      const text = range.toString();
-      const length = text.length;
-      let gradientHTML = '';
+      const selected = inputText.slice(selectionStart, selectionEnd);
+      let output = '';
 
-      for (let i = 0; i < length; i++) {
-        const t = length > 1 ? i / (length - 1) : 0;
-        const r1 = Math.round(lerp(fgStart.r, fgEnd.r, t));
-        const g1 = Math.round(lerp(fgStart.g, fgEnd.g, t));
-        const b1 = Math.round(lerp(fgStart.b, fgEnd.b, t));
-        const r2 = Math.round(lerp(bgStart.r, bgEnd.r, t));
-        const g2 = Math.round(lerp(bgStart.g, bgEnd.g, t));
-        const b2 = Math.round(lerp(bgStart.b, bgEnd.b, t));
-        const ch = text[i] === ' ' ? '&nbsp;' : text[i];
+      for (let i = 0; i < selected.length; i++) {
+        const t = selected.length > 1 ? i / (selected.length - 1) : 0;
+        const rF = Math.round(lerp(fgStart.r, fgEnd.r, t));
+        const gF = Math.round(lerp(fgStart.g, fgEnd.g, t));
+        const bF = Math.round(lerp(fgStart.b, fgEnd.b, t));
 
-        gradientHTML += `<span style="color: rgb(${r1},${g1},${b1}); background-color: rgb(${r2},${g2},${b2});">${ch}</span>`;
+        let ansi = ansiColor(rF, gF, bF);
+
+        if (useBG) {
+          const rB = Math.round(lerp(bgStart.r, bgEnd.r, t));
+          const gB = Math.round(lerp(bgStart.g, bgEnd.g, t));
+          const bB = Math.round(lerp(bgStart.b, bgEnd.b, t));
+          ansi += ansiColor(rB, gB, bB, true);
+        }
+
+        const ch = selected[i];
+        output += `${ansi}${ch}`;
       }
 
-      const span = document.createElement('span');
-      span.innerHTML = gradientHTML;
-      range.deleteContents();
-      range.insertNode(span);
+      output += '\u001b[0m';
+
+      document.getElementById('ansiOutput').textContent = output;
     });
   </script>
 </body>
