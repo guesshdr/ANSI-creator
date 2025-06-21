@@ -86,7 +86,8 @@
   </div>
 
   <div class="options">
-    <label><input type="checkbox" id="includeBG" checked> Użyj tła</label>
+    <label><input type="checkbox" id="includeFG" checked> Użyj tekstu</label>
+    <label><input type="checkbox" id="includeBG"> Użyj tła</label>
   </div>
 
   <button id="applyBtn">Zastosuj gradient do zaznaczenia</button>
@@ -113,9 +114,10 @@
     }
 
     document.getElementById('applyBtn').addEventListener('click', () => {
-      const inputText = document.getElementById('inputText').value;
-      const selectionStart = document.getElementById('inputText').selectionStart;
-      const selectionEnd = document.getElementById('inputText').selectionEnd;
+      const textarea = document.getElementById('inputText');
+      const inputText = textarea.value;
+      const selectionStart = textarea.selectionStart;
+      const selectionEnd = textarea.selectionEnd;
 
       if (selectionStart === selectionEnd) {
         alert("Zaznacz fragment tekstu w polu wejściowym.");
@@ -126,6 +128,7 @@
       const fgEnd = hexToRgb(document.getElementById('fgEnd').value);
       const bgStart = hexToRgb(document.getElementById('bgStart').value);
       const bgEnd = hexToRgb(document.getElementById('bgEnd').value);
+      const useFG = document.getElementById('includeFG').checked;
       const useBG = document.getElementById('includeBG').checked;
 
       const selected = inputText.slice(selectionStart, selectionEnd);
@@ -133,11 +136,15 @@
 
       for (let i = 0; i < selected.length; i++) {
         const t = selected.length > 1 ? i / (selected.length - 1) : 0;
-        const rF = Math.round(lerp(fgStart.r, fgEnd.r, t));
-        const gF = Math.round(lerp(fgStart.g, fgEnd.g, t));
-        const bF = Math.round(lerp(fgStart.b, fgEnd.b, t));
 
-        let ansi = ansiColor(rF, gF, bF);
+        let ansi = '';
+
+        if (useFG) {
+          const rF = Math.round(lerp(fgStart.r, fgEnd.r, t));
+          const gF = Math.round(lerp(fgStart.g, fgEnd.g, t));
+          const bF = Math.round(lerp(fgStart.b, fgEnd.b, t));
+          ansi += ansiColor(rF, gF, bF);
+        }
 
         if (useBG) {
           const rB = Math.round(lerp(bgStart.r, bgEnd.r, t));
@@ -151,7 +158,6 @@
       }
 
       output += '\u001b[0m';
-
       document.getElementById('ansiOutput').textContent = output;
     });
   </script>
