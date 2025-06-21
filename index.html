@@ -1,1 +1,86 @@
-siema
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Gradient ASCII ANSI</title>
+  <style>
+    body {
+      font-family: monospace;
+      background: #121212;
+      color: #f0f0f0;
+      padding: 20px;
+    }
+    textarea, input[type="color"] {
+      width: 100%;
+      margin-top: 10px;
+    }
+    pre {
+      background: #1e1e1e;
+      padding: 10px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      border-radius: 5px;
+      margin-top: 20px;
+    }
+    label {
+      margin-top: 10px;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+<h1>🎨 Gradient do ASCII z ANSI Escape</h1>
+
+<label for="ascii">Wprowadź ASCII art / tekst:</label>
+<textarea id="ascii" rows="6">Hello\nWorld!</textarea>
+
+<label for="startColor">Kolor początkowy:</label>
+<input type="color" id="startColor" value="#f7e3e3">
+
+<label for="endColor">Kolor końcowy:</label>
+<input type="color" id="endColor" value="#000000">
+
+<button onclick="applyGradient()">🎨 Generuj z gradientem</button>
+
+<h2>Wynikowy tekst ANSI:</h2>
+<pre id="output"></pre>
+
+<script>
+function hexToRgb(hex) {
+  const bigint = parseInt(hex.slice(1), 16);
+  return [ (bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255 ];
+}
+
+function applyGradient() {
+  const text = document.getElementById("ascii").value.replace(/\r/g, "");
+  const startColor = hexToRgb(document.getElementById("startColor").value);
+  const endColor = hexToRgb(document.getElementById("endColor").value);
+  const output = [];
+
+  const totalChars = text.replace(/\n/g, '').length;
+  let charIndex = 0;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === "\n") {
+      output.push("\\x1b[0m\n");
+      continue;
+    }
+
+    const ratio = totalChars <= 1 ? 0 : charIndex / (totalChars - 1);
+    const r = Math.round(startColor[0] + ratio * (endColor[0] - startColor[0]));
+    const g = Math.round(startColor[1] + ratio * (endColor[1] - startColor[1]));
+    const b = Math.round(startColor[2] + ratio * (endColor[2] - startColor[2]));
+
+    output.push(`\\x1b[38;2;${r};${g};${b}m${char}`);
+    charIndex++;
+  }
+
+  output.push("\\x1b[0m");
+  document.getElementById("output").textContent = output.join('');
+}
+</script>
+
+</body>
+</html>
